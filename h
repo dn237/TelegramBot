@@ -1,0 +1,165 @@
+[33mcommit ce267eac8af70c567eddc597c6ebe989b3e8ed16[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Diana Nichvolodova <w2016501@westminster.ac.uk>
+Date:   Wed Mar 11 23:26:32 2026 +0000
+
+    Remove legacy bot.py
+
+[1mdiff --git a/bot.py b/bot.py[m
+[1mdeleted file mode 100644[m
+[1mindex a3bd781..0000000[m
+[1m--- a/bot.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,384 +0,0 @@[m
+[31m-# Import necessary libraries[m
+[31m-import telebot  # Used for interacting with the Telegram Bot API.[m
+[31m-from telebot import types  # Necessary for creating custom keyboards and interactive buttons.[m
+[31m-import tmdbsimple as tmdb  # Used to access The Movie Database (TMDB) API easily.[m
+[31m-import random  # Used for generating random selections.[m
+[31m-import requests  # Used for making HTTP requests.[m
+[31m-import logging  # Used for logging messages and errors.[m
+[31m-import json  # Used for JSON data handling.[m
+[31m-from functools import lru_cache  # Used to cache results of function calls.[m
+[31m-[m
+[31m-###HEEEEEEEEEEEEEEEEELOOOOLLLLLOL786678678678678678[m
+[31m-[m
+[31m-# Set up basic configuration for logging to help with debugging.[m
+[31m-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')[m
+[31m-logger = logging.getLogger(__name__)[m
+[31m-[m
+[31m-# Set API keys for TMDB and configure the Telegram bot with a token.[m
+[31m-tmdb.API_KEY = 'f95282a62bc8ad0d06f78ce91156b997'[m
+[31m-bot = telebot.TeleBot('6715626173:AAE8b7M8rOgG3ihPurA2IRe5ibU6khypVzs')[m
+[31m-[m
+[31m-# Function to load user preferences from a JSON file or create a new one if it doesn't exist.[m
+[31m-def load_preferences():[m
+[31m-    try:[m
+[31m-        with open('user_preferences.json', 'r') as file:[m
+[31m-            return json.load(file)[m
+[31m-    except FileNotFoundError:[m
+[31m-        logger.info("User preferences file not found, creating new one.")[m
+[31m-        return {}[m
+[31m-[m
+[31m-# Function to save user preferences to a JSON file.[m
+[31m-def save_preferences(preferences):[m
+[31m-    with open('user_preferences.json', 'w') as file:[m
+[31m-        json.dump(preferences, file, indent=4)[m
+[31m-[m
+[31m-# Load user preferences on startup.[m
+[31m-user_preferences = load_preferences()[m
+[31m-[m
+[31m-# Command handler to start interaction with the bot[m
+[31m-@bot.message_handler(commands=['start'])[m
+[31m-def start(message):[m
+[31m-    try:[m
+[31m-        user_id = message.chat.id[m
+[31m-        initialize_user_preferences(user_id)  # Initialize preferences when the chat starts[m
+[31m-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)[m
+[31m-        btn1 = types.KeyboardButton('Pick a random movie')[m
+[31m-        btn2 = types.KeyboardButton('Select a movie by genre')[m
+[31m-        btn3 = types.KeyboardButton('Display a list of available commands')[m
+[31m-        markup.row(btn1, btn2, btn3)[m
+[31m-        bot.send_message(message.chat.id, f'Hi, {message.from_user.first_name}! How can I help you today?', reply_markup=markup)[m
+[31m-    except Exception as e:[m
+[31m-        logger.error("An error occurred: %s", str(e))[m
+[31m-        bot.send_message(message.chat.id, "Sorry, I'm unable to start at the moment. Please try again later.")[m
+[31m-[m
+[31m-# Command handler to start the search for similar movies[m
+[31m-@bot.message_handler(commands=['recommend_movies'])[m
+[31m-def recommend_movies(message):[m
+[31m-    logger.info("Recommend movies command received from user %s.", message.chat.id)[m
+[31m-    sent_msg = bot.send_message(message.chat.id, "Please enter the name of the movie:")[m
+[31m-    bot.register_next_step_handler(sent_msg, process_movie_recommendation)[m
+[31m-[m
+[31m-# Command handler to set user's genre preference[m
+[31m-@bot.message_handler(commands=['set_genre_preference'])[m
+[31m-def ask_for_user_preference(message):[m
+[31m-    user_id = message.chat.id[m
+[31m-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)[m
+[31m-    for genre_name in get_genres().keys():[m
+[31m-        markup.add(types.KeyboardButton(genre_name))[m
+[31m-    msg = bot.send_message(message.chat.id, "Choose your preferred genre:", reply_markup=markup)[m
+[31m-    bot.register_next_step_handler(msg, set_genre_preference)[m
+[31m-[m
+[31m-@bot.message_handler(commands=['clear_preferences'])[m
+[31m-def clear_preferences(message):[m
+[31m-    user_id = message.chat.id[m
+[31m-    user_preferences[user_id] = {'watched': []}[m
+[31m-    save_preferences(user_preferences)[m
+[31m-    bot.send_message(message.chat.id, "Your preferences have been reset.")[m
+[31m-[m
+[31m-[m
+[31m-@lru_cache(maxsize=1)[m
+[31m-def get_genres():[m
+[31m-    try:[m
+[31m-        response = tmdb.Genres().movie_list()[m
+[31m-        genres = {genre['name']: genre['id'] for genre in response['genres']}[m
+[31m-        logger.info(f"Genres fetched: {genres}")[m
+[31m-        return genres[m
+[31m-    except Exception as e:[m
+[31m-        logger.error("Failed to fetch genres: %s", str(e))[m
+[31m-        return {}[m
+[31m-[m
+[31m-[m
+[31m-#error simulating[m
+[31m-#@lru_cache(maxsize=1)[m
+[31m-#def get_genres():[m
+[31m-#    raise Exception("Simulated API error: Unable to fetch genres.")[m
+[31m-[m
+[31m-@lru_cache(maxsize=100)[m
+[31m-def cached_movie_search(genre_id, page):[m
+[31m-    try:[m
+[31m-        response = tmdb.Discover().movie(with_genres=str(genre_id), page=page)[m
+[31m-        return response['results'][m
+[31m-    except Exception as e:[m
+[31m-        logger.error("Error fetching movies by genre: %s", e)[m
+[31m-        return [][m
+[31m-[m
+[31m-def search_movies_by_genre(genre_id, user_id, max_pages=3):[m
+[31m-    all_movies = [][m
+[31m-    for page in range(1, max_pages+1):[m
+[31m-        movies = cached_movie_search(genre_id, page)[m
+[31m-        all_movies.extend(movies)[m
+[31m-    watched_movies = user_preferences.get(user_id, {}).get('watched', [])[m
+[31m-    return [movie for movie in all_movies if movie['id'] not in watched_movies][m
+[31m-[m
+[31m-[m
+[31m-def is_valid_genre_id(genre_id):[m
+[31m-    genres = get_genres()[m
+[31m-    return genre_id.isdigit() and int(genre_id) in genres.values()[m
+[31m-[m
+[31m-[m
+[31m-def set_user_genre_preference(user_id, genre_id, call):[m
+[31m-    if is_valid_genre_id(genre_id):[m
+[31m-        user_preferences[user_id]['genre'] = int(genre_id)[m
+[31m-        save_preferences(user_preferences)[m
+[31m-        bot.send_message(call.message.chat.id, f"Genre preference set to {get_genres()[int(genre_id)]}.")[m
+[31m-        start(call.message)[m
+[31m-    else:[m
+[31m-        bot.send_message(call.message.chat.id, "Invalid genre selected.")[m
+[31m-[m
+[31m-def show_another_movie_from_genre(call, genre_id, user_id):[m
+[31m-    if is_valid_genre_id(genre_id):[m
+[31m-        movies = search_movies_by_genre(int(genre_id), user_id)[m
+[31m-        if movies:[m
+[31m-            random_movie = random.choice(movies)[m
+[31m-            send_movie_details(call.message, random_movie, int(genre_id))[m
+[31m-        else:[m
+[31m-            bot.send_message(call.message.chat.id, "No more unwatched movies available in this genre.")[m
+[31m-    else:[m
+[31m-        bot.send_message(call.message.chat.id, "Invalid genre selected.")[m
+[31m-[m
+[31m-[m
+[31m-def mark_movie_as_watched(call, movie_id, user_id):[m
+[31m-    user_preferences[user_id].setdefault('watched', []).append(movie_id)[m
+[31m-    save_preferences(user_preferences)[m
+[31m-    bot.answer_callback_query(call.id, "Movie marked as watched.")[m
+[31m-[m
+[31m-def delete_message(call):[m
+[31m-    bot.delete_message(call.message.chat.id, call.message.message_id)[m
+[31m-    bot.answer_callback_query(call.id, "Message deleted.")[m
+[31m-[m
+[31m-def cancel_operation(call):[m
+[31m-    bot.answer_callback_query(call.id, "Operation cancelled.")[m
+[31m-[m
+[31m-[m
+[31m-# Function to get the URL of a mov
