@@ -1,0 +1,6 @@
+.env
+.venv/
+.vscode/
+__pycache__/
+*.py[cod]
+user_preferences.json
