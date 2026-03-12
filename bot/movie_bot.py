@@ -81,8 +81,12 @@ class MovieBot:
             markup.row(
                 types.KeyboardButton("Pick a random movie"),
                 types.KeyboardButton("Select a movie by genre"),
+            )
+            markup.row(
                 types.KeyboardButton("Set quality preferences"),
                 types.KeyboardButton("Show my profile"),
+            )
+            markup.row(
                 types.KeyboardButton("Display a list of available commands"),
             )
             self._bot.send_message(
