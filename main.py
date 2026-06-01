@@ -13,7 +13,7 @@ logging.basicConfig(
 
 def main() -> None:
     config = Config()
-    prefs = UserPreferencesManager(config.PREFERENCES_FILE)
+    prefs = UserPreferencesManager()
     tmdb_service = TMDBService(config.TMDB_API_KEY, config.MAX_CAST_MEMBERS)
     bot = MovieBot(config.TELEGRAM_BOT_TOKEN, tmdb_service, prefs, config.MAX_PAGES)
     bot.run()

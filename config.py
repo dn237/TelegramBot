@@ -14,9 +14,6 @@ class Config:
     TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", "")
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-    # Path to the JSON file used for persisting user preferences.
-    PREFERENCES_FILE: str = "user_preferences.json"
-
     # How many pages of TMDB results to fetch when searching by genre.
     MAX_PAGES: int = 3
 

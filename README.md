@@ -1,6 +1,6 @@
-# 🎬 Movie Recommendation Telegram Bot
+# 🎬 Movie Tracker & Recommender Telegram Bot
 
-A Telegram bot that delivers personalized movie recommendations powered by [The Movie Database (TMDB)](https://www.themoviedb.org/) API. Users can discover films by genre, get title-based suggestions, and fine-tune results through a learning feedback system that adapts to their taste over time.
+A Telegram bot that delivers personalized movie recommendations powered by [The Movie Database (TMDB)](https://www.themoviedb.org/) API and stores user history in a local SQLite database. Users can discover films by genre, get title-based suggestions, track watched history, and fine-tune results through a feedback system that adapts to their taste over time.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Telegram Bot API](https://img.shields.io/badge/Telegram%20Bot%20API-pyTelegramBotAPI-26A5E4?logo=telegram&logoColor=white)
@@ -17,6 +17,7 @@ A Telegram bot that delivers personalized movie recommendations powered by [The 
 - **Like / Dislike Feedback** — Rate each suggestion; the bot learns your genre preferences and ranks future picks accordingly.
 - **User Profile** — View your saved filters, feedback stats, and top liked/disliked genres at a glance.
 - **Watched History** — Automatically tracks movies you've seen so you never get the same recommendation twice.
+- **SQLite Persistence** — User preferences, history, and movie collection data are stored locally in `telegrambot.db`.
 - **Rich Movie Cards** — Each recommendation includes poster, overview, rating, year, genre, country, cast, and a YouTube trailer link.
 
 ## Architecture
@@ -25,20 +26,22 @@ A Telegram bot that delivers personalized movie recommendations powered by [The 
 TelegramBot/
 ├── main.py                  # Entry point — wires config, services, and bot
 ├── config.py                # Centralised configuration (env vars + defaults)
-├── bot/
-│   └── movie_bot.py         # Telegram handlers, menus, callback routing
+├── models/
+│   ├── schema.py            # SQLAlchemy ORM models
+│   └── user_preferences.py  # DB-backed user state & feedback repository
 ├── services/
 │   └── tmdb_service.py      # TMDB API wrapper with in-memory caching
-├── models/
-│   └── user_preferences.py  # JSON-backed user state & feedback persistence
+└── telegrambot.db           # Local SQLite database (generated at runtime)
+│   ├── schema.py            # SQLAlchemy ORM models
+│   └── user_preferences.py  # DB-backed user state & feedback persistence
 ├── requirements.txt
 ├── Procfile                 # Heroku / PaaS deployment descriptor
-└── user_preferences.json    # Auto-generated runtime data (git-ignored)
+└── telegrambot.db           # Auto-generated runtime data (local SQLite DB)
 ```
 
 The codebase follows a **service-oriented** design with clear separation of concerns:
 
-| Layer | Responsibility |
+| **UserPreferencesManager** | Persists watched history, genre preference, quality filters, and like/dislike feedback to SQLite. |
 |-------|---------------|
 | **Config** | Reads secrets from environment variables; no credentials in code. |
 | **TMDBService** | Wraps the TMDB API — genre look-ups, movie discovery, cast/trailer fetching — with per-session caching. |
@@ -50,6 +53,7 @@ The codebase follows a **service-oriented** design with clear separation of conc
 - **Language:** Python 3.10+
 - **Telegram Framework:** [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI) (telebot)
 - **Movie Data:** [TMDB API](https://developer.themoviedb.org/) via [tmdbsimple](https://github.com/celiao/tmdbsimple)
+- **Database:** SQLite + SQLAlchemy
 - **Environment Management:** python-dotenv
 - **Deployment:** Heroku-ready (Procfile included)
 
@@ -88,6 +92,8 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TMDB_API_KEY=your_tmdb_api_key
 ```
 
+SQLite is created automatically on first run as `telegrambot.db` in the project root.
+
 ### Run
 
 ```bash
@@ -123,8 +129,36 @@ The included `Procfile` makes the bot deployable to Heroku or any compatible Paa
 worker: python main.py
 ```
 
-Set `TELEGRAM_BOT_TOKEN` and `TMDB_API_KEY` as environment variables on your hosting platform.
+Set `TELEGRAM_BOT_TOKEN` and `TMDB_API_KEY` as environment variables on your hosting platform. The SQLite file must also be persisted if you want user data to survive restarts.
 
 ## License
 
 This project is open-source and available under the [MIT License](LICENSE).
+
+## Importing movie lists
+
+To import plain-text movie lists into the local SQLite database use the provided importer script `scripts/migrate_text_list.py`.
+
+- Each input line may include a leading emoji marker: `✅` for watched or `🎬` for to-watch. If no marker is present the item is treated as planned (to-watch) by default.
+- The script creates/updates entries in the `users`, `movies_cache`, and `user_collection` tables.
+
+Examples:
+
+```powershell
+# Import a file and force every line to be marked watched
+python scripts/migrate_text_list.py --file data/watched.txt --telegram-id 123456 --watched --require-tmdb
+
+# Import a file and force every line to be marked planned (to-watch)
+python scripts/migrate_text_list.py --file data/to_watch.txt --telegram-id 123456 --to-watch --require-tmdb
+
+# Title-only import (no TMDB resolution)
+python scripts/migrate_text_list.py --file data/to_watch.txt --telegram-id 123456 --skip-tmdb
+```
+
+Flags:
+
+- `--watched` / `--to-watch`: Mutually exclusive flags to force all imported lines to the specified status.
+- `--skip-tmdb`: Import titles without resolving them against TMDB (creates lightweight cache rows).
+- `--require-tmdb`: Fail early if TMDB API key validation fails (otherwise the script falls back to title-only mode).
+
+Note: The importer attempts to auto-detect file encodings (UTF-8, UTF-16, CP1252). Keep your original files until you confirm the import results in the DB.
