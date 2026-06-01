@@ -17,6 +17,10 @@ A Telegram bot that delivers personalized movie recommendations powered by [The 
 - **Like / Dislike Feedback** — Rate each suggestion; the bot learns your genre preferences and ranks future picks accordingly.
 - **User Profile** — View your saved filters, feedback stats, and top liked/disliked genres at a glance.
 - **Watched History** — Automatically tracks movies you've seen so you never get the same recommendation twice.
+- **Paginated Library Browser** — Browse watched, to-watch, and full movie lists with next/previous inline buttons.
+- **Per-Movie Actions** — Open a movie card, mark it watched/to-watch, or remove it directly from the library view.
+- **Quick Save Buttons** — Movie cards now let you save watched/to-watch directly into your profile DB.
+- **Safe Removal** — Library deletes always ask for confirmation first.
 - **SQLite Persistence** — User preferences, history, and movie collection data are stored locally in `telegrambot.db`.
 - **Rich Movie Cards** — Each recommendation includes poster, overview, rating, year, genre, country, cast, and a YouTube trailer link.
 
@@ -31,9 +35,6 @@ TelegramBot/
 │   └── user_preferences.py  # DB-backed user state & feedback repository
 ├── services/
 │   └── tmdb_service.py      # TMDB API wrapper with in-memory caching
-└── telegrambot.db           # Local SQLite database (generated at runtime)
-│   ├── schema.py            # SQLAlchemy ORM models
-│   └── user_preferences.py  # DB-backed user state & feedback persistence
 ├── requirements.txt
 ├── Procfile                 # Heroku / PaaS deployment descriptor
 └── telegrambot.db           # Auto-generated runtime data (local SQLite DB)
@@ -41,11 +42,9 @@ TelegramBot/
 
 The codebase follows a **service-oriented** design with clear separation of concerns:
 
-| **UserPreferencesManager** | Persists watched history, genre preference, quality filters, and like/dislike feedback to SQLite. |
-|-------|---------------|
 | **Config** | Reads secrets from environment variables; no credentials in code. |
 | **TMDBService** | Wraps the TMDB API — genre look-ups, movie discovery, cast/trailer fetching — with per-session caching. |
-| **UserPreferencesManager** | Persists watched history, genre preference, quality filters, and like/dislike feedback to a JSON file. |
+| **UserPreferencesManager** | Persists watched history, genre preference, quality filters, and like/dislike feedback to SQLite. |
 | **MovieBot** | Owns the Telegram bot instance; registers all command, text, and callback handlers; delegates business logic to the service and model layers. |
 
 ## Tech Stack
@@ -107,11 +106,29 @@ The bot starts long-polling and is ready to use in Telegram.
 | Command | Description |
 |---------|-------------|
 | `/start` | Launch the bot and display the main menu. |
+| `/help` | Show the command list and shortcut overview. |
+| `/menu` | Alias for `/start`. |
 | `/set_genre_preference` | Choose a preferred genre for random picks. |
 | `/set_quality_preference` | Set minimum rating and release year filters. |
 | `/my_profile` | View your saved preferences and taste profile. |
+| `/my_movies` | Display all of your saved movies. |
+| `/my_watched` | Display the movies you have already watched. |
+| `/my_to_watch` | Display the movies you still plan to watch. |
 | `/recommend_movies` | Get recommendations based on a movie title. |
 | `/clear_preferences` | Reset all watched history and preferences. |
+
+### Main menu shortcuts
+
+- Pick a random movie
+- Select a movie by genre
+- Set genre preference
+- Recommend by title
+- Browse my library
+- Set quality preferences
+- Show my profile
+- Help / commands
+- Reset preferences
+- Open movies and manage library items inline
 
 ## How the Recommendation Engine Works
 
@@ -146,13 +163,13 @@ Examples:
 
 ```powershell
 # Import a file and force every line to be marked watched
-python scripts/migrate_text_list.py --file data/watched.txt --telegram-id 123456 --watched --require-tmdb
+python scripts/migrate_text_list.py --file path\to\watched_list.txt --telegram-id 123456 --watched --require-tmdb
 
 # Import a file and force every line to be marked planned (to-watch)
-python scripts/migrate_text_list.py --file data/to_watch.txt --telegram-id 123456 --to-watch --require-tmdb
+python scripts/migrate_text_list.py --file path\to\to_watch_list.txt --telegram-id 123456 --to-watch --require-tmdb
 
 # Title-only import (no TMDB resolution)
-python scripts/migrate_text_list.py --file data/to_watch.txt --telegram-id 123456 --skip-tmdb
+python scripts/migrate_text_list.py --file path\to\movie_list.txt --telegram-id 123456 --skip-tmdb
 ```
 
 Flags:

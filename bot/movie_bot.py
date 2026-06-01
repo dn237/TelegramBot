@@ -1,5 +1,7 @@
 import logging
 import random
+import html
+import math
 
 import telebot
 from telebot import types
@@ -10,6 +12,7 @@ from services.tmdb_service import TMDBService
 logger = logging.getLogger(__name__)
 
 TELEGRAM_PHOTO_CAPTION_LIMIT = 1024
+COLLECTION_PAGE_SIZE = 8
 
 
 class MovieBot:
@@ -57,10 +60,14 @@ class MovieBot:
         b = self._bot
 
         b.message_handler(commands=["start"])(self._cmd_start)
+        b.message_handler(commands=["help", "menu"])(self._cmd_help)
         b.message_handler(commands=["recommend_movies"])(self._cmd_recommend_movies)
         b.message_handler(commands=["set_genre_preference"])(self._cmd_set_genre_preference)
         b.message_handler(commands=["set_quality_preference"])(self._cmd_set_quality_preference)
         b.message_handler(commands=["my_profile"])(self._cmd_my_profile)
+        b.message_handler(commands=["my_movies"])(self._cmd_my_movies)
+        b.message_handler(commands=["my_watched"])(self._cmd_my_watched)
+        b.message_handler(commands=["my_to_watch"])(self._cmd_my_to_watch)
         b.message_handler(commands=["clear_preferences"])(self._cmd_clear_preferences)
 
         # Media handler must be registered before the catch-all text handler.
@@ -77,18 +84,7 @@ class MovieBot:
         """Greets the user and displays the main menu keyboard."""
         try:
             self._prefs.initialize_user(message.chat.id)
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-            markup.row(
-                types.KeyboardButton("Pick a random movie"),
-                types.KeyboardButton("Select a movie by genre"),
-            )
-            markup.row(
-                types.KeyboardButton("Set quality preferences"),
-                types.KeyboardButton("Show my profile"),
-            )
-            markup.row(
-                types.KeyboardButton("Display a list of available commands"),
-            )
+            markup = self._build_main_menu_markup()
             self._bot.send_message(
                 message.chat.id,
                 f"Hi, {message.from_user.first_name}! How can I help you today?",
@@ -132,9 +128,30 @@ class MovieBot:
         self._cmd_start(message)
 
     def _cmd_clear_preferences(self, message) -> None:
-        """Resets all stored preferences (watched history and genre) for the user."""
-        self._prefs.clear(message.chat.id)
-        self._bot.send_message(message.chat.id, "Your preferences have been reset.")
+        """Asks for confirmation before resetting all stored preferences."""
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("Yes, reset everything", callback_data="clear_confirm"),
+            types.InlineKeyboardButton("Cancel", callback_data="clear_cancel"),
+        )
+        self._bot.send_message(
+            message.chat.id,
+            "This will clear your genre, rating/year filters, watched history, and feedback. Continue?",
+            reply_markup=markup,
+        )
+
+    def _cmd_help(self, message) -> None:
+        """Shows the main command and shortcut overview."""
+        self._bot.send_message(message.chat.id, self._build_help_text(), parse_mode="HTML")
+
+    def _cmd_my_movies(self, message) -> None:
+        self._send_movie_collection(message.chat.id, status=None, heading="All your movies")
+
+    def _cmd_my_watched(self, message) -> None:
+        self._send_movie_collection(message.chat.id, status="watched", heading="Your watched movies")
+
+    def _cmd_my_to_watch(self, message) -> None:
+        self._send_movie_collection(message.chat.id, status="planned", heading="Your to-watch movies")
 
     def _cmd_set_quality_preference(self, message) -> None:
         """Starts the flow for setting min rating and min release year filters."""
@@ -230,20 +247,26 @@ class MovieBot:
             self._send_random_movie(message, user_id)
         elif text == "select a movie by genre":
             self._show_genre_menu(message)
+        elif text == "set genre preference":
+            self._cmd_set_genre_preference(message)
+        elif text == "show my watched list":
+            self._send_movie_collection(message.chat.id, status="watched", heading="Your watched movies")
+        elif text == "show my to-watch list":
+            self._send_movie_collection(message.chat.id, status="planned", heading="Your to-watch movies")
+        elif text == "show all my movies":
+            self._send_movie_collection(message.chat.id, status=None, heading="All your movies")
+        elif text == "recommend by title":
+            self._cmd_recommend_movies(message)
         elif text == "set quality preferences":
             self._cmd_set_quality_preference(message)
         elif text == "show my profile":
             self._cmd_my_profile(message)
-        elif text == "display a list of available commands":
-            commands = (
-                "/start — Restart the bot.\n"
-                "/set_genre_preference — Set your preferred genre.\n"
-                "/set_quality_preference — Set minimum rating/year filters.\n"
-                "/my_profile — Show your saved preferences and taste profile.\n"
-                "/recommend_movies — Get recommendations based on a movie title.\n"
-                "/clear_preferences — Reset your watched history and genre preference."
-            )
-            self._bot.send_message(message.chat.id, commands)
+        elif text == "help / commands":
+            self._cmd_help(message)
+        elif text == "browse my library":
+            self._show_library_menu(message)
+        elif text == "reset preferences":
+            self._cmd_clear_preferences(message)
 
     def _handle_media(self, message) -> None:
         """Responds to photo/audio/video messages with a delete prompt."""
@@ -294,6 +317,64 @@ class MovieBot:
             elif data == "main_menu":
                 self._cmd_start(call.message)
 
+            elif data == "library_menu":
+                self._show_library_menu(call.message)
+
+            elif data == "library_watched":
+                self._send_movie_collection(call.message.chat.id, status="watched", heading="Your watched movies")
+
+            elif data == "library_to_watch":
+                self._send_movie_collection(call.message.chat.id, status="planned", heading="Your to-watch movies")
+
+            elif data == "library_all":
+                self._send_movie_collection(call.message.chat.id, status=None, heading="All your movies")
+
+            elif data == "library_help":
+                self._bot.send_message(call.message.chat.id, self._build_help_text(), parse_mode="HTML")
+
+            elif data.startswith("collection|"):
+                _, status_key, page_text = data.split("|", 2)
+                status = None if status_key == "all" else status_key
+                page = max(1, int(page_text))
+                heading = self._collection_heading(status)
+                self._edit_movie_collection(call, call.message.chat.id, status, heading, page)
+
+            elif data.startswith("movie_action|"):
+                _, action, status_key, page_text, movie_text = data.split("|", 4)
+                status = None if status_key == "all" else status_key
+                page = max(1, int(page_text))
+                movie_id = int(movie_text)
+                self._handle_collection_movie_action(call, user_id, action, status, page, movie_id)
+
+            elif data.startswith("collection_remove_confirm|"):
+                _, status_key, page_text, movie_text = data.split("|", 3)
+                status = None if status_key == "all" else status_key
+                page = max(1, int(page_text))
+                movie_id = int(movie_text)
+                self._confirm_collection_removal(call, user_id, status, page, movie_id)
+
+            elif data.startswith("collection_remove_cancel|"):
+                _, status_key, page_text, movie_text = data.split("|", 3)
+                status = None if status_key == "all" else status_key
+                page = max(1, int(page_text))
+                heading = self._collection_heading(status)
+                self._bot.answer_callback_query(call.id, "Removal cancelled.")
+                self._edit_movie_collection(call, user_id, status, heading, page)
+
+            elif data.startswith("card_save|"):
+                _, status, movie_text = data.split("|", 2)
+                movie_id = int(movie_text)
+                self._handle_card_save_action(call, user_id, movie_id, status)
+
+            elif data == "clear_confirm":
+                self._prefs.clear(user_id)
+                self._bot.answer_callback_query(call.id, "Preferences reset.")
+                self._bot.send_message(call.message.chat.id, "Your preferences have been reset.")
+                self._cmd_start(call.message)
+
+            elif data == "clear_cancel":
+                self._bot.answer_callback_query(call.id, "Reset cancelled.")
+
             elif data == "DELETE":
                 self._callback_delete_media(call)
 
@@ -342,13 +423,42 @@ class MovieBot:
             markup.add(types.InlineKeyboardButton(name, callback_data=f"genre_{gid}"))
         self._bot.send_message(message.chat.id, "Please select a genre:", reply_markup=markup)
 
+    def _show_library_menu(self, message) -> None:
+        """Sends a submenu for browsing the user's movie library."""
+        markup = types.InlineKeyboardMarkup()
+        markup.row(
+            types.InlineKeyboardButton("Watched", callback_data="library_watched"),
+            types.InlineKeyboardButton("To-watch", callback_data="library_to_watch"),
+        )
+        markup.row(types.InlineKeyboardButton("All movies", callback_data="library_all"))
+        markup.row(
+            types.InlineKeyboardButton("Help / commands", callback_data="library_help"),
+            types.InlineKeyboardButton("Main menu", callback_data="main_menu"),
+        )
+        self._bot.send_message(
+            message.chat.id,
+            "Browse your saved movie lists:",
+            reply_markup=markup,
+        )
+
     def _send_movie_details(self, message, movie: dict, genre_id) -> None:
         """
         Builds and sends the full movie info card (poster, details, action buttons).
         Also marks the movie as watched for this user.
         """
+        self._send_movie_details_with_options(message, movie, genre_id, mark_watched=True)
+
+    def _send_movie_details_with_options(
+        self,
+        message,
+        movie: dict,
+        genre_id,
+        mark_watched: bool,
+        extra_buttons: list[types.InlineKeyboardButton] | None = None,
+    ) -> None:
         user_id = message.chat.id
-        self._prefs.mark_watched(user_id, movie["id"])
+        if mark_watched:
+            self._prefs.upsert_movie_collection(user_id, movie, "watched")
 
         poster_url = self._tmdb.get_poster_url(movie)
         trailer = self._tmdb.get_trailer_url(movie["id"])
@@ -393,6 +503,12 @@ class MovieBot:
             types.InlineKeyboardButton("Like", callback_data=f"like_{movie['id']}"),
             types.InlineKeyboardButton("Dislike", callback_data=f"dislike_{movie['id']}"),
         )
+        markup.row(
+            types.InlineKeyboardButton("Mark watched", callback_data=f"card_save|watched|{movie['id']}"),
+            types.InlineKeyboardButton("Mark to-watch", callback_data=f"card_save|planned|{movie['id']}"),
+        )
+        if extra_buttons:
+            markup.row(*extra_buttons)
 
         if poster_url:
             # Telegram photo captions are limited to 1024 chars.
@@ -415,6 +531,165 @@ class MovieBot:
                 self._bot.send_message(message.chat.id, info, parse_mode="HTML")
         else:
             self._bot.send_message(message.chat.id, info, parse_mode="HTML", reply_markup=markup)
+
+    def _handle_collection_movie_action(
+        self,
+        call,
+        user_id: int,
+        action: str,
+        status: str | None,
+        page: int,
+        movie_id: int,
+    ) -> None:
+        item = self._prefs.get_collection_item(user_id, movie_id)
+        if not item:
+            self._bot.answer_callback_query(call.id, "Movie not found in your library.")
+            return
+
+        status_key = "all" if status is None else status
+        heading = self._collection_heading(status)
+
+        if action == "open":
+            self._show_collection_movie_details(call, item, status, page)
+            return
+
+        if action == "watch":
+            ok = self._prefs.set_collection_status(user_id, movie_id, "watched")
+            message = "Marked as watched." if ok else "Could not update this movie."
+        elif action == "plan":
+            ok = self._prefs.set_collection_status(user_id, movie_id, "planned")
+            message = "Moved to your to-watch list." if ok else "Could not update this movie."
+        elif action == "remove":
+            self._show_remove_confirmation(call, item, status, page)
+            return
+        else:
+            self._bot.answer_callback_query(call.id, "Unknown action.")
+            return
+
+        self._bot.answer_callback_query(call.id, message)
+        self._edit_movie_collection(call, call.message.chat.id, status, heading, page)
+
+    def _handle_card_save_action(self, call, user_id: int, movie_id: int, status: str) -> None:
+        movie = self._tmdb.get_movie_info(movie_id)
+        if not movie:
+            self._bot.answer_callback_query(call.id, "Movie details not available.")
+            return
+
+        ok = self._prefs.upsert_movie_collection(user_id, movie, status)
+        if ok:
+            message = "Added to your watched movies." if status == "watched" else "Added to your to-watch list."
+        else:
+            message = "Could not save this movie."
+        self._bot.answer_callback_query(call.id, message)
+
+    def _show_remove_confirmation(self, call, item: dict, status: str | None, page: int) -> None:
+        status_key = "all" if status is None else status
+        text = (
+            f"<b>Remove this movie?</b>\n"
+            f"{html.escape(item.get('title', 'Untitled'))}\n\n"
+            "This will remove the movie from your library."
+        )
+        markup = types.InlineKeyboardMarkup()
+        markup.row(
+            types.InlineKeyboardButton(
+                "Yes, remove",
+                callback_data=f"collection_remove_confirm|{status_key}|{page}|{item['movie_id']}",
+            ),
+            types.InlineKeyboardButton(
+                "Cancel",
+                callback_data=f"collection_remove_cancel|{status_key}|{page}|{item['movie_id']}",
+            ),
+        )
+        markup.row(
+            types.InlineKeyboardButton("Back to library", callback_data="library_menu"),
+            types.InlineKeyboardButton("Main menu", callback_data="main_menu"),
+        )
+        self._bot.edit_message_text(
+            text,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="HTML",
+            reply_markup=markup,
+        )
+        self._bot.answer_callback_query(call.id, "Confirm removal.")
+
+    def _confirm_collection_removal(self, call, user_id: int, status: str | None, page: int, movie_id: int) -> None:
+        ok = self._prefs.remove_movie_from_collection(user_id, movie_id)
+        message = "Removed from your library." if ok else "Could not remove this movie."
+        self._bot.answer_callback_query(call.id, message)
+        heading = self._collection_heading(status)
+        self._edit_movie_collection(call, user_id, status, heading, page)
+
+    def _show_collection_movie_details(self, call, item: dict, status: str | None, page: int) -> None:
+        tmdb_id = item.get("tmdb_id")
+        if tmdb_id:
+            movie = self._tmdb.get_movie_info(int(tmdb_id)) or {}
+            if movie:
+                movie.setdefault("title", item.get("title", "Untitled"))
+                movie.setdefault("overview", item.get("overview") or "No description available.")
+                genre_ids = [g.get("id") for g in movie.get("genres", []) if isinstance(g.get("id"), int)]
+                genre_id = genre_ids[0] if genre_ids else 0
+                self._send_movie_details_with_options(
+                    call.message,
+                    movie,
+                    genre_id,
+                    mark_watched=False,
+                    extra_buttons=[
+                        types.InlineKeyboardButton("Back to list", callback_data=f"collection|{status or 'all'}|{page}"),
+                        types.InlineKeyboardButton("Library", callback_data="library_menu"),
+                    ],
+                )
+                self._bot.answer_callback_query(call.id, "Opened movie details.")
+                return
+
+        title = html.escape(item.get("title", "Untitled"))
+        overview = html.escape(item.get("overview") or "No description available.")
+        text = (
+            f"<b>🎬 Title:</b> {title}\n"
+            f"<b>📄 Status:</b> {html.escape(item.get('status', 'planned'))}\n"
+            f"<b>🍿 Overview:</b> {overview}"
+        )
+        markup = types.InlineKeyboardMarkup()
+        if status == "planned":
+            markup.row(
+                types.InlineKeyboardButton(
+                    "Mark watched",
+                    callback_data=f"movie_action|watch|{status or 'all'}|1|{item['movie_id']}",
+                ),
+                types.InlineKeyboardButton(
+                    "Remove",
+                    callback_data=f"movie_action|remove|{status or 'all'}|1|{item['movie_id']}",
+                ),
+            )
+        elif status == "watched":
+            markup.row(
+                types.InlineKeyboardButton(
+                    "Mark to-watch",
+                    callback_data=f"movie_action|plan|{status or 'all'}|1|{item['movie_id']}",
+                ),
+                types.InlineKeyboardButton(
+                    "Remove",
+                    callback_data=f"movie_action|remove|{status or 'all'}|1|{item['movie_id']}",
+                ),
+            )
+        else:
+            markup.row(
+                types.InlineKeyboardButton(
+                    "Mark watched",
+                    callback_data=f"movie_action|watch|all|1|{item['movie_id']}",
+                ),
+                types.InlineKeyboardButton(
+                    "Remove",
+                    callback_data=f"movie_action|remove|all|1|{item['movie_id']}",
+                ),
+            )
+        markup.row(
+            types.InlineKeyboardButton("Back to list", callback_data=f"collection|{status or 'all'}|{page}"),
+            types.InlineKeyboardButton("Library", callback_data="library_menu"),
+            types.InlineKeyboardButton("Main menu", callback_data="main_menu"),
+        )
+        self._bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
+        self._bot.answer_callback_query(call.id, "Opened movie details.")
 
     def _callback_show_movie_in_genre(self, call, genre_id: str, user_id: int) -> None:
         """Picks and sends a random unwatched movie for the chosen genre."""
@@ -489,6 +764,151 @@ class MovieBot:
                 best_movies.append(movie)
 
         return random.choice(best_movies)
+
+    def _send_movie_collection(self, user_id: int, status: str | None, heading: str) -> None:
+        items = self._prefs.get_movie_collection(user_id, status=status)
+        if not items:
+            self._bot.send_message(user_id, f"No movies found for {html.escape(heading.lower())}.", parse_mode="HTML")
+            return
+
+        text, markup = self._build_collection_page(items, heading, status, page=1)
+        self._bot.send_message(user_id, text, parse_mode="HTML", reply_markup=markup)
+
+    def _edit_movie_collection(self, call, user_id: int, status: str | None, heading: str, page: int) -> None:
+        items = self._prefs.get_movie_collection(user_id, status=status)
+        if not items:
+            self._bot.answer_callback_query(call.id, "No movies found.")
+            return
+
+        text, markup = self._build_collection_page(items, heading, status, page=page)
+        try:
+            self._bot.edit_message_text(
+                text,
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
+            self._bot.answer_callback_query(call.id)
+        except Exception:
+            self._bot.send_message(call.message.chat.id, text, parse_mode="HTML", reply_markup=markup)
+
+    def _build_collection_page(
+        self,
+        items: list[dict],
+        heading: str,
+        status: str | None,
+        page: int = 1,
+    ) -> tuple[str, types.InlineKeyboardMarkup | None]:
+        total_pages = max(1, math.ceil(len(items) / COLLECTION_PAGE_SIZE))
+        current_page = min(max(1, page), total_pages)
+        start = (current_page - 1) * COLLECTION_PAGE_SIZE
+        end = start + COLLECTION_PAGE_SIZE
+        page_items = items[start:end]
+
+        body = [
+            f"<b>{html.escape(heading)}</b>",
+            f"<i>Page {current_page}/{total_pages} • {len(items)} item(s)</i>",
+            "<i>Tap a title to open its card.</i>",
+        ]
+
+        markup = types.InlineKeyboardMarkup()
+        for item in page_items:
+            status_key = "all" if status is None else status
+            label = f"▶ {item['title'][:28]}"
+            if status is None:
+                label = f"▶ [{item['status']}] {item['title'][:20]}"
+            markup.row(
+                types.InlineKeyboardButton(
+                    label,
+                    callback_data=f"movie_action|open|{status_key}|{current_page}|{item['movie_id']}",
+                )
+            )
+        nav_buttons = []
+        status_key = "all" if status is None else status
+        if current_page > 1:
+            nav_buttons.append(
+                types.InlineKeyboardButton("◀ Prev", callback_data=f"collection|{status_key}|{current_page - 1}")
+            )
+        if current_page < total_pages:
+            nav_buttons.append(
+                types.InlineKeyboardButton("Next ▶", callback_data=f"collection|{status_key}|{current_page + 1}")
+            )
+        if nav_buttons:
+            markup.row(*nav_buttons)
+        markup.row(
+            types.InlineKeyboardButton("Library", callback_data="library_menu"),
+            types.InlineKeyboardButton("Main menu", callback_data="main_menu"),
+        )
+
+        return "\n".join(body), markup
+
+    def _collection_heading(self, status: str | None) -> str:
+        if status == "watched":
+            return "Your watched movies"
+        if status == "planned":
+            return "Your to-watch movies"
+        return "All your movies"
+
+    def _build_main_menu_markup(self) -> types.ReplyKeyboardMarkup:
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        markup.row(
+            types.KeyboardButton("Pick a random movie"),
+            types.KeyboardButton("Select a movie by genre"),
+        )
+        markup.row(
+            types.KeyboardButton("Set genre preference"),
+            types.KeyboardButton("Recommend by title"),
+            types.KeyboardButton("Browse my library"),
+        )
+        markup.row(
+            types.KeyboardButton("Set quality preferences"),
+            types.KeyboardButton("Show my profile"),
+        )
+        markup.row(
+            types.KeyboardButton("Help / commands"),
+            types.KeyboardButton("Reset preferences"),
+        )
+        return markup
+
+    def _build_help_text(self) -> str:
+        return (
+            "<b>Available commands</b>\n"
+            "/start — Open the main menu.\n"
+            "/help — Show this command list.\n"
+            "/menu — Alias for /start.\n"
+            "/recommend_movies — Get recommendations from a movie title.\n"
+            "/set_genre_preference — Choose your preferred genre.\n"
+            "/set_quality_preference — Set minimum rating/year filters.\n"
+            "/my_profile — View your learned taste profile.\n"
+            "/my_movies — Show all saved movies.\n"
+            "/my_watched — Show watched movies only.\n"
+            "/my_to_watch — Show to-watch movies only.\n"
+            "/clear_preferences — Reset all saved preferences and history.\n\n"
+            "<b>Main menu shortcuts</b>\n"
+            "Pick a random movie · Select a movie by genre · Set genre preference · Recommend by title · Browse my library\n"
+            "<i>Library removals ask for confirmation before deleting.</i>"
+        )
+
+    def _chunk_text(self, lines: list[str], max_chars: int = 3500) -> list[str]:
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+
+        for line in lines:
+            line_len = len(line) + 1
+            if current and current_len + line_len > max_chars:
+                chunks.append("\n".join(current))
+                current = [line]
+                current_len = line_len
+            else:
+                current.append(line)
+                current_len += line_len
+
+        if current:
+            chunks.append("\n".join(current))
+
+        return chunks
 
     def _format_top_genres(self, counters: dict, top_n: int = 3) -> str:
         """Converts genre-id counters into a readable top-N genre summary."""

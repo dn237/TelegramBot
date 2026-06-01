@@ -87,6 +87,165 @@ class UserPreferencesManager:
             user = self._get_user(session, user_id)
             return self._loads_list(user.watched)
 
+    def get_movie_collection(self, user_id: int, status: Optional[str] = None) -> list[dict]:
+        with self._session() as session:
+            user = self._get_user(session, user_id)
+            query = (
+                session.query(schema.UserCollection)
+                .join(schema.MovieCache)
+                .filter(schema.UserCollection.user_id == user.id)
+                .order_by(schema.UserCollection.updated_at.desc(), schema.MovieCache.title_en.asc())
+            )
+            if status:
+                query = query.filter(schema.UserCollection.status == status)
+
+            items = []
+            for entry in query.all():
+                title = entry.movie.title_en or entry.movie.title_ru or "Untitled"
+                items.append(
+                    {
+                        "id": entry.id,
+                        "movie_id": entry.movie_id,
+                        "tmdb_id": entry.movie.tmdb_id,
+                        "title": title,
+                        "status": entry.status,
+                        "updated_at": entry.updated_at,
+                        "overview": entry.movie.overview,
+                        "poster_path": entry.movie.poster_path,
+                    }
+                )
+            return items
+
+    def get_collection_item(self, user_id: int, movie_id: int) -> Optional[dict]:
+        with self._session() as session:
+            user = self._get_user(session, user_id)
+            entry = (
+                session.query(schema.UserCollection)
+                .join(schema.MovieCache)
+                .filter(schema.UserCollection.user_id == user.id, schema.UserCollection.movie_id == movie_id)
+                .first()
+            )
+            if not entry:
+                return None
+
+            title = entry.movie.title_en or entry.movie.title_ru or "Untitled"
+            return {
+                "id": entry.id,
+                "movie_id": entry.movie_id,
+                "tmdb_id": entry.movie.tmdb_id,
+                "title": title,
+                "status": entry.status,
+                "updated_at": entry.updated_at,
+                "overview": entry.movie.overview,
+                "poster_path": entry.movie.poster_path,
+            }
+
+    def set_collection_status(self, user_id: int, movie_id: int, status: str) -> bool:
+        with self._session() as session:
+            user = self._get_user(session, user_id)
+            entry = (
+                session.query(schema.UserCollection)
+                .filter(schema.UserCollection.user_id == user.id, schema.UserCollection.movie_id == movie_id)
+                .first()
+            )
+            if not entry:
+                movie = session.query(schema.MovieCache).filter(schema.MovieCache.id == movie_id).first()
+                if not movie:
+                    return False
+                entry = schema.UserCollection(user_id=user.id, movie_id=movie_id, status=status)
+                session.add(entry)
+
+            else:
+                entry.status = status
+
+            watched = self._loads_list(user.watched)
+            if status == "watched":
+                if movie_id not in watched:
+                    watched.append(movie_id)
+            else:
+                if movie_id in watched:
+                    watched.remove(movie_id)
+            user.watched = self._dumps(watched)
+            session.commit()
+            return True
+
+    def upsert_movie_collection(self, user_id: int, movie: dict, status: str) -> bool:
+        tmdb_id = movie.get("id")
+        if tmdb_id is None:
+            return False
+
+        tmdb_id = int(tmdb_id)
+        title = movie.get("title") or movie.get("name") or "Untitled"
+        overview = movie.get("overview")
+        poster_path = movie.get("poster_path")
+        original_language = movie.get("original_language")
+
+        with self._session() as session:
+            user = self._get_user(session, user_id)
+
+            movie_entry = session.query(schema.MovieCache).filter(schema.MovieCache.tmdb_id == tmdb_id).first()
+            if not movie_entry:
+                movie_entry = schema.MovieCache(
+                    tmdb_id=tmdb_id,
+                    title_en=title,
+                    title_ru=title if original_language == "ru" else None,
+                    poster_path=poster_path,
+                    collection_name=(movie.get("belongs_to_collection") or {}).get("name") if movie.get("belongs_to_collection") else None,
+                    part_number=None,
+                    overview=overview,
+                )
+                session.add(movie_entry)
+                session.flush()
+            else:
+                movie_entry.title_en = title or movie_entry.title_en
+                if original_language == "ru" and not movie_entry.title_ru:
+                    movie_entry.title_ru = title
+                movie_entry.poster_path = poster_path or movie_entry.poster_path
+                movie_entry.overview = overview or movie_entry.overview
+
+            collection_entry = (
+                session.query(schema.UserCollection)
+                .filter(schema.UserCollection.user_id == user.id, schema.UserCollection.movie_id == movie_entry.id)
+                .first()
+            )
+            if not collection_entry:
+                collection_entry = schema.UserCollection(user_id=user.id, movie_id=movie_entry.id, status=status)
+                session.add(collection_entry)
+            else:
+                collection_entry.status = status
+
+            watched = self._loads_list(user.watched)
+            if status == "watched":
+                if movie_entry.id not in watched:
+                    watched.append(movie_entry.id)
+            else:
+                if movie_entry.id in watched:
+                    watched.remove(movie_entry.id)
+            user.watched = self._dumps(watched)
+
+            session.commit()
+            return True
+
+    def remove_movie_from_collection(self, user_id: int, movie_id: int) -> bool:
+        with self._session() as session:
+            user = self._get_user(session, user_id)
+            entry = (
+                session.query(schema.UserCollection)
+                .filter(schema.UserCollection.user_id == user.id, schema.UserCollection.movie_id == movie_id)
+                .first()
+            )
+            if not entry:
+                return False
+
+            watched = self._loads_list(user.watched)
+            if movie_id in watched:
+                watched.remove(movie_id)
+                user.watched = self._dumps(watched)
+
+            session.delete(entry)
+            session.commit()
+            return True
+
     def mark_watched(self, user_id: int, movie_id: int) -> None:
         with self._session() as session:
             user = self._get_user(session, user_id)

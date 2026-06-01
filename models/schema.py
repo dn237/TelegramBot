@@ -57,6 +57,36 @@ class MovieCache(Base):
     users = relationship("UserCollection", back_populates="movie")
 
 
+class UserFeedback(Base):
+    __tablename__ = "user_feedback"
+    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="u_user_feedback_movie"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, ForeignKey("movies_cache.id", ondelete="CASCADE"), nullable=False)
+    feedback_type = Column(String(16), nullable=False)
+    genre_ids = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+    movie = relationship("MovieCache")
+
+
+class UserGenrePreference(Base):
+    __tablename__ = "user_genre_preferences"
+    __table_args__ = (UniqueConstraint("user_id", "genre_id", "feedback_type", name="u_user_genre_feedback"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    genre_id = Column(Integer, nullable=False, index=True)
+    feedback_type = Column(String(16), nullable=False)
+    score = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
 class UserCollection(Base):
     """Represents a user's relation to a cached movie.
 
@@ -77,3 +107,4 @@ class UserCollection(Base):
 
     def is_watched(self) -> bool:
         return self.status == "watched"
+
