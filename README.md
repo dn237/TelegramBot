@@ -1,6 +1,8 @@
 # 🎬 Movie Tracker & Recommender Telegram Bot
 
-A Telegram bot that delivers personalized movie recommendations powered by [The Movie Database (TMDB)](https://www.themoviedb.org/) API and stores user history in a local SQLite database. Users can discover films by genre, get title-based suggestions, track watched history, and fine-tune results through a feedback system that adapts to their taste over time.
+A highly advanced, personalized Telegram bot that delivers movie recommendations powered by [The Movie Database (TMDB)](https://www.themoviedb.org/) API and stores your entire library in a local SQLite database. 
+
+With a premium UI, dynamic library sorting, automatic franchise grouping, and an intelligent feedback system, this bot adapts to your exact tastes over time.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Telegram Bot API](https://img.shields.io/badge/Telegram%20Bot%20API-pyTelegramBotAPI-26A5E4?logo=telegram&logoColor=white)
@@ -8,174 +10,55 @@ A Telegram bot that delivers personalized movie recommendations powered by [The 
 
 ---
 
-## Features
+## ✨ Features
 
-- **Random Movie Picker** — Get a random movie suggestion filtered by your preferred genre, minimum rating, and release year.
-- **Browse by Genre** — Choose from all TMDB genres via an inline keyboard and explore movies one at a time.
-- **Title-Based Recommendations** — Enter any movie title and receive a list of similar films from TMDB.
-- **Quality Filters** — Set a minimum TMDB rating (0–10) and minimum release year to control recommendation quality.
-- **Like / Dislike Feedback** — Rate each suggestion; the bot learns your genre preferences and ranks future picks accordingly.
-- **User Profile** — View your saved filters, feedback stats, and top liked/disliked genres at a glance.
-- **Watched History** — Automatically tracks movies you've seen so you never get the same recommendation twice.
-- **Paginated Library Browser** — Browse watched, to-watch, and full movie lists with next/previous inline buttons.
-- **Per-Movie Actions** — Open a movie card, mark it watched/to-watch, or remove it directly from the library view.
-- **Quick Save Buttons** — Movie cards now let you save watched/to-watch directly into your profile DB.
-- **Safe Removal** — Library deletes always ask for confirmation first.
-- **SQLite Persistence** — User preferences, history, and movie collection data are stored locally in `telegrambot.db`.
-- **Rich Movie Cards** — Each recommendation includes poster, overview, rating, year, genre, country, cast, and a YouTube trailer link.
+*   **📦 Automatic Franchise Grouping**
+    Movies saved to your library are automatically scanned and grouped into their official TMDB Collections (e.g., *The Harry Potter Collection*, *The Avengers Collection*).
+*   **📁 Custom Playlists**
+    Create and manage your own custom collections dynamically (e.g., "Halloween Movies," "Date Night") right from the movie card. You can safely delete them anytime.
+*   **🧠 Intelligent Taste Profile**
+    Rate suggestions with Like/Dislike. The bot actively learns your specific genre preferences and mathematically ranks future recommendations to suit your taste.
+*   **🎛️ Paginated "Control Panel" UI**
+    Navigate massive libraries easily with a sleek, paginated inline keyboard UI that keeps your chat history clean and organized.
+*   **🌐 Advanced Quality & Language Filters**
+    Set a minimum TMDB rating (0–10), minimum release year, and block specific audio languages so you only get high-quality recommendations you actually want to watch.
+*   **🗄️ SQLite Persistence & Caching**
+    User preferences, watched history, and library metadata are stored locally in `telegrambot.db`. The bot caches API requests to prevent rate-limiting.
+*   **🍿 Rich Movie Cards**
+    Every recommendation pulls the official poster, overview, release year, genre, country, cast, and a direct YouTube trailer link.
 
-## Architecture
+---
 
-```
-TelegramBot/
-├── main.py                  # Entry point — wires config, services, and bot
-├── config.py                # Centralised configuration (env vars + defaults)
-├── models/
-│   ├── schema.py            # SQLAlchemy ORM models
-│   └── user_preferences.py  # DB-backed user state & feedback repository
-├── services/
-│   └── tmdb_service.py      # TMDB API wrapper with in-memory caching
-├── requirements.txt
-├── Procfile                 # Heroku / PaaS deployment descriptor
-└── telegrambot.db           # Auto-generated runtime data (local SQLite DB)
-```
+## 🏗️ Architecture
 
-The codebase follows a **service-oriented** design with clear separation of concerns:
+The codebase follows a clean, **service-oriented** design:
 
-| **Config** | Reads secrets from environment variables; no credentials in code. |
-| **TMDBService** | Wraps the TMDB API — genre look-ups, movie discovery, cast/trailer fetching — with per-session caching. |
-| **UserPreferencesManager** | Persists watched history, genre preference, quality filters, and like/dislike feedback to SQLite. |
-| **MovieBot** | Owns the Telegram bot instance; registers all command, text, and callback handlers; delegates business logic to the service and model layers. |
+*   **`main.py` & `config.py`**: Centralized configuration and entry point.
+*   **`bot/movie_bot.py`**: The core router. Handles all Telegram commands, free-text matching, and callback dispatching.
+*   **`handlers/`**: Dedicated UI logic. `library.py` handles the complex paginated menus and dynamic sorting, while `movie_cards.py` formats the media output.
+*   **`services/tmdb_service.py`**: Wraps the TMDB API with intelligent in-memory caching.
+*   **`models/`**: SQLAlchemy ORM models (`schema.py`) and the DB-backed repository (`user_preferences.py`) for handling all CRUD operations.
 
-## Tech Stack
+---
 
-- **Language:** Python 3.10+
-- **Telegram Framework:** [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI) (telebot)
-- **Movie Data:** [TMDB API](https://developer.themoviedb.org/) via [tmdbsimple](https://github.com/celiao/tmdbsimple)
-- **Database:** SQLite + SQLAlchemy
-- **Environment Management:** python-dotenv
-- **Deployment:** Heroku-ready (Procfile included)
-
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
-
-- Python 3.10 or higher
-- A [Telegram Bot Token](https://core.telegram.org/bots#how-do-i-create-a-bot) (via BotFather)
-- A [TMDB API Key](https://developer.themoviedb.org/docs/getting-started) (free account)
+*   Python 3.10+
+*   A [Telegram Bot Token](https://core.telegram.org/bots#how-do-i-create-a-bot) (via BotFather)
+*   A [TMDB API Key](https://developer.themoviedb.org/docs/getting-started) (free account)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/dn237/TelegramBot.git
+git clone [https://github.com/yourusername/TelegramBot.git](https://github.com/yourusername/TelegramBot.git)
 cd TelegramBot
 
 # Create and activate a virtual environment
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-```
-
-### Configuration
-
-Create a `.env` file in the project root:
-
-```env
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TMDB_API_KEY=your_tmdb_api_key
-```
-
-SQLite is created automatically on first run as `telegrambot.db` in the project root.
-
-### Run
-
-```bash
-python main.py
-```
-
-The bot starts long-polling and is ready to use in Telegram.
-
-## Bot Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Launch the bot and display the main menu. |
-| `/help` | Show the command list and shortcut overview. |
-| `/menu` | Alias for `/start`. |
-| `/set_genre_preference` | Choose a preferred genre for random picks. |
-| `/set_quality_preference` | Set minimum rating and release year filters. |
-| `/my_profile` | View your saved preferences and taste profile. |
-| `/my_movies` | Display all of your saved movies. |
-| `/my_watched` | Display the movies you have already watched. |
-| `/my_to_watch` | Display the movies you still plan to watch. |
-| `/recommend_movies` | Get recommendations based on a movie title. |
-| `/clear_preferences` | Reset all watched history and preferences. |
-
-### Main menu shortcuts
-
-- Pick a random movie
-- Select a movie by genre
-- Set genre preference
-- Recommend by title
-- Browse my library
-- Set quality preferences
-- Show my profile
-- Help / commands
-- Reset preferences
-- Open movies and manage library items inline
-
-## How the Recommendation Engine Works
-
-1. **Genre Filtering** — Movies are fetched from TMDB's Discover endpoint for the selected genre across multiple pages.
-2. **Quality Filtering** — Results are filtered by the user's minimum rating and release year thresholds.
-3. **Watch Deduplication** — Previously seen movies are excluded automatically.
-4. **Personalized Ranking** — Each candidate is scored using accumulated like/dislike genre weights. Movies whose genres align with the user's positive feedback are ranked higher, while disliked genres are penalized.
-5. **Tie-Breaking** — Among equally scored movies, TMDB rating is used as a secondary signal, and final selection is randomized for variety.
-
-## Deployment
-
-The included `Procfile` makes the bot deployable to Heroku or any compatible PaaS:
-
-```
-worker: python main.py
-```
-
-Set `TELEGRAM_BOT_TOKEN` and `TMDB_API_KEY` as environment variables on your hosting platform. The SQLite file must also be persisted if you want user data to survive restarts.
-
-## License
-
-This project is open-source and available under the [MIT License](LICENSE).
-
-## Importing movie lists
-
-To import plain-text movie lists into the local SQLite database use the provided importer script `scripts/migrate_text_list.py`.
-
-- Each input line may include a leading emoji marker: `✅` for watched or `🎬` for to-watch. If no marker is present the item is treated as planned (to-watch) by default.
-- The script creates/updates entries in the `users`, `movies_cache`, and `user_collection` tables.
-
-Examples:
-
-```powershell
-# Import a file and force every line to be marked watched
-python scripts/migrate_text_list.py --file path\to\watched_list.txt --telegram-id 123456 --watched --require-tmdb
-
-# Import a file and force every line to be marked planned (to-watch)
-python scripts/migrate_text_list.py --file path\to\to_watch_list.txt --telegram-id 123456 --to-watch --require-tmdb
-
-# Title-only import (no TMDB resolution)
-python scripts/migrate_text_list.py --file path\to\movie_list.txt --telegram-id 123456 --skip-tmdb
-```
-
-Flags:
-
-- `--watched` / `--to-watch`: Mutually exclusive flags to force all imported lines to the specified status.
-- `--skip-tmdb`: Import titles without resolving them against TMDB (creates lightweight cache rows).
-- `--require-tmdb`: Fail early if TMDB API key validation fails (otherwise the script falls back to title-only mode).
-
-Note: The importer attempts to auto-detect file encodings (UTF-8, UTF-16, CP1252). Keep your original files until you confirm the import results in the DB.

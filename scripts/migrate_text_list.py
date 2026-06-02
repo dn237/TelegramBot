@@ -6,9 +6,7 @@ If no marker is present, the script will try to detect `watched` / `to watch`
 words; otherwise the item is treated as `planned`.
 
 Usage:
-    python scripts/migrate_text_list.py --file mylist.txt --telegram-id 123456
-    python scripts/migrate_text_list.py --file watched.txt --telegram-id 123456 --watched
-    python scripts/migrate_text_list.py --file to_watch.txt --telegram-id 123456 --to-watch
+    python scripts/migrate_text_list.py --file "D:\Projects\TelegramBot\data\mylist.txt" --telegram-id 656386448
 
 Requires `TMDB_API_KEY` env var or `--tmdb-key` argument.
 """
@@ -201,54 +199,42 @@ def main(argv: list[str] | None = None) -> int:
                     session.rollback()
                     movie = session.query(schema.MovieCache).filter_by(title_en=title).first()
             else:
+                # 1. Look up the movie ID on TMDB
                 tmdb_id = tmdb.find_movie_by_name(title)
                 if tmdb_id is None:
                     logger.warning("Could not resolve title: %s", title)
                     skipped += 1
                     continue
 
-                # Check or insert movie cache
-                movie = session.query(schema.MovieCache).filter_by(tmdb_id=tmdb_id).first()
-                if not movie:
-                    info = tmdb.get_movie_info(tmdb_id)
-                    movie = schema.MovieCache(
-                        tmdb_id=tmdb_id,
-                        title_en=info.get("title") or title,
-                        title_ru=info.get("title") if info.get("original_language") == "ru" else None,
-                        poster_path=info.get("poster_path"),
-                        collection_name=(info.get("belongs_to_collection") or {}).get("name") if info.get("belongs_to_collection") else None,
-                        part_number=None,
-                        overview=info.get("overview"),
-                    )
-                    session.add(movie)
-                    try:
-                        session.commit()
-                    except IntegrityError:
-                        session.rollback()
-                        movie = session.query(schema.MovieCache).filter_by(tmdb_id=tmdb_id).first()
-
-                # Create or update user_collection
-                existing = (
-                    session.query(schema.UserCollection)
-                    .filter_by(user_id=user.id, movie_id=movie.id)
-                    .first()
-                )
-                if existing:
-                    # upgrade status if needed
-                    if status == STATUS_WATCHED and not existing.is_watched():
-                        existing.status = STATUS_WATCHED
-                        session.commit()
+                # 2. Get movie metadata from TMDB
+                info = tmdb.get_movie_info(tmdb_id)
+                if not info:
+                    logger.warning("Could not retrieve movie details from TMDB: %s", title)
                     skipped += 1
                     continue
 
-                uc = schema.UserCollection(user_id=user.id, movie_id=movie.id, status=status)
-                session.add(uc)
-                try:
-                    session.commit()
+                # 3. Safely extract franchise/collection name if it belongs to one
+                collection_name = None
+                belongs_to = info.get("belongs_to_collection")
+                if belongs_to and isinstance(belongs_to, dict):
+                    collection_name = belongs_to.get("name")
+
+                # 4. Use your custom preferences manager to handle the update safely!
+                from models.user_preferences import UserPreferencesManager
+                prefs = UserPreferencesManager(lambda: session)
+
+                success = prefs.upsert_movie_collection(
+                    user_id=args.telegram_id,
+                    movie=info,
+                    status=status,
+                    collection_name=collection_name,
+                    part_number=None  # Leave None, TMDB metadata handles grouping
+                )
+
+                if success:
                     created += 1
-                    logger.info("Imported: %s -> %s", title, status)
-                except IntegrityError:
-                    session.rollback()
+                    logger.info("Imported via Manager: %s -> %s", title, status)
+                else:
                     skipped += 1
 
         logger.info("Done. Created=%s, Skipped=%s", created, skipped)

@@ -38,6 +38,7 @@ class User(Base):
     disliked_movies = Column(Text, nullable=False, default="[]")
     liked_genres = Column(Text, nullable=False, default="{}")
     disliked_genres = Column(Text, nullable=False, default="{}")
+    blocked_languages = Column(Text, nullable=False, default="[]")
 
     collection = relationship("UserCollection", back_populates="user")
 
@@ -53,7 +54,7 @@ class MovieCache(Base):
     collection_name = Column(String(256), nullable=True)
     part_number = Column(Integer, nullable=True)
     overview = Column(Text, nullable=True)
-
+    genres = Column(String(512), nullable=True)  # Changed to match your existing style!
     users = relationship("UserCollection", back_populates="movie")
 
 
@@ -106,5 +107,6 @@ class UserCollection(Base):
     movie = relationship("MovieCache", back_populates="users")
 
     def is_watched(self) -> bool:
-        return self.status == "watched"
+        return self.status == "watched" # type: ignore
+
 
