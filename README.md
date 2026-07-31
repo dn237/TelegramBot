@@ -90,3 +90,13 @@ d:/Projects/TelegramBot/.venv/Scripts/python.exe main.py
 - Secrets should never be committed; `.env` is ignored by `.gitignore`.
 - Use `telegrambot.db` (SQLite) for demo data; include a small sample DB if you want to show live data.
 - Keep the code modular and well-documented — `main.py` is a small entrypoint suitable for showcasing in a portfolio.
+
+### Demo database
+
+To produce a reproducible demo DB suitable for screenshots or automated tests, run the provided seeder script. This creates `telegrambot.sample.db` by default and does not overwrite your real data.
+
+```powershell
+python scripts/seed_demo_db.py --out telegrambot.sample.db
+```
+
+If you previously committed `telegrambot.db` to the repository, consider removing it and using the seeder above to generate a sanitized example database.
