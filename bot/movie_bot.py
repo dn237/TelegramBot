@@ -1,3 +1,10 @@
+"""Telegram command handlers and high-level bot routing.
+
+`MovieBot` encapsulates the `telebot.TeleBot` instance and registers
+all command and callback handlers used by the UI. Handlers delegate
+to `services` and `models` to keep this layer focused on I/O.
+"""
+
 import logging
 import random
 import html
@@ -8,7 +15,7 @@ from telebot import types
 from models.user_preferences import UserPreferencesManager
 from services.tmdb_service import TMDBService
 
-# Import your clean UI handlers
+# Import your UI handlers (encapsulate presentation logic)
 from handlers.library import LibraryHandler
 from handlers.movie_cards import MovieCardHandler
 
@@ -22,18 +29,25 @@ class MovieBot:
         prefs: UserPreferencesManager,
         max_pages: int = 3,
     ) -> None:
+        """Create bot instance and register handlers.
+
+        Keep the constructor lightweight: inject the services and the
+        preferences manager to make the class easy to unit-test.
+        """
         self._bot = telebot.TeleBot(token)
         self._tmdb = tmdb_service
         self._prefs = prefs
         self._max_pages = max_pages
-        
-        # Initialize UI handlers
+
+        # UI handler objects encapsulate message formatting and view logic.
         self.library = LibraryHandler(self._bot, self._prefs)
         self.cards = MovieCardHandler(self._bot, self._prefs, self._tmdb)
-        
+
         self._register_handlers()
 
     def run(self) -> None:
+        """Start long-polling. In production you may replace this with
+        a webhook-based deployment; polling is convenient for local demos."""
         logger.info("Bot is running.")
         self._bot.polling(none_stop=True)
 

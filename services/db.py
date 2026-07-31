@@ -1,8 +1,15 @@
-"""Database configuration: SQLAlchemy engine, Base, and session factory.
+"""SQLAlchemy engine and session setup.
 
-Defaults to a local SQLite database at `./telegrambot.db`. The URL can be
-overridden with the `DATABASE_URL` environment variable.
+The app reads `DATABASE_URL` from the environment (or defaults to a
+local SQLite file). When using SQLite in multi-threaded contexts we
+set `check_same_thread=False` so the debugger / threaded polling does
+not error during local demos.
+
+This module exposes `engine`, `SessionLocal` and `Base` for ORM models
+to import and use. Use `get_db()` as a context / generator that yields
+sessions and ensures they are closed.
 """
+
 from __future__ import annotations
 
 import os

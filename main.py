@@ -28,6 +28,13 @@ def main() -> None:
         if resp.status_code != 200:
             logging.error(
                 "TELEGRAM_BOT_TOKEN validation failed (%s): %s",
+                """Entry point for the MovieRec Telegram bot.
+
+                This module wires together configuration, services, and the bot
+                implementation and starts the bot. It also performs quick runtime
+                validation (token / API key) so failures are clear for demo/portfolio use.
+                """
+
                 resp.status_code,
                 resp.text,
             )

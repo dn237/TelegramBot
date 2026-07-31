@@ -1,3 +1,10 @@
+"""Lightweight wrapper around The Movie Database (TMDB) API.
+
+This service centralizes TMDB calls used by the bot and keeps simple
+in-memory caches for genres and paginated movie lists to reduce API
+traffic during a demo or portfolio run.
+"""
+
 import logging
 from typing import Optional
 
@@ -48,7 +55,11 @@ class TMDBService:
         return self._genres_cache
 
     def is_valid_genre_id(self, genre_id: str) -> bool:
-        """Returns True when genre_id is a digit string that matches a known genre."""
+        """Return True when `genre_id` looks like an integer and exists.
+
+        The bot persists genre IDs as strings in some places; this helper
+        normalizes that check.
+        """
         return genre_id.isdigit() and int(genre_id) in self.get_genres().values()
 
     def get_genre_names(self, genre_ids: list) -> str:

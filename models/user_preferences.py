@@ -1,3 +1,10 @@
+"""Database-backed user preference manager.
+
+This class provides a small, easy-to-understand API used throughout the
+bot for reading and updating a user's preferences and movie collections.
+Methods mirror the earlier JSON-backed API to minimize caller changes.
+"""
+
 import json
 import logging
 from typing import Optional, cast
@@ -11,11 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class UserPreferencesManager:
-    """DB-backed user preference manager.
+    """Manage user preferences and collections stored in the DB.
 
-    Keeps the same method names as the previous JSON implementation, but stores
-    all preferences in the `users` table so the bot can run without a local JSON
-    preferences file.
+    Each public method opens a session, performs a focused operation, and
+    commits changes. This keeps transaction boundaries explicit and simple.
     """
 
     def __init__(self, file_path: str | None = None) -> None:
@@ -34,6 +40,9 @@ class UserPreferencesManager:
         return int(user_id)
 
     def _get_user(self, session, user_id: int) -> schema.User:
+        # Ensure a User row exists for the given Telegram ID and return it.
+        # `telegram_id` is stored on the `users` table and is used as the
+        # stable key across the bot's UI and persistence layer.
         user = session.query(schema.User).filter_by(telegram_id=self._key(user_id)).first()
         if not user:
             user = schema.User(telegram_id=self._key(user_id))
