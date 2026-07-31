@@ -1,4 +1,6 @@
 import time
+from typing import Any, cast
+
 from services.db import SessionLocal
 from models import schema
 from services.tmdb_service import TMDBService
@@ -35,13 +37,16 @@ def backfill_old_movies():
             # 2. Extract Franchise (Collection)
             belongs_to = tmdb_info.get("belongs_to_collection")
             if belongs_to and isinstance(belongs_to, dict):
-                movie.collection_name = belongs_to.get("name")
+                # Pylance may treat ORM mapped attributes as `Column[...]` types and
+                # complain when assigning `Optional[str]` to them. Cast the
+                # instance to `Any` for the assignment to satisfy the type checker.
+                cast(Any, movie).collection_name = belongs_to.get("name")
 
             # 3. Extract Genres (Just in case older movies are missing this too!)
             genre_list = tmdb_info.get("genres", [])
             genre_names = [g.get("name") for g in genre_list if g.get("name")]
             if genre_names:
-                movie.genres = ", ".join(genre_names)
+                cast(Any, movie).genres = ", ".join(genre_names)
 
             updated_count += 1
             print(f"🔄 Updated: {movie.title_en} -> 📦 {movie.collection_name or 'None'} | 📂 {movie.genres or 'None'}")
