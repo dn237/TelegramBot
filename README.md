@@ -2,7 +2,7 @@
 
 A highly advanced, personalized Telegram bot that delivers movie recommendations powered by [The Movie Database (TMDB)](https://www.themoviedb.org/) API and stores your entire library in a local SQLite database. 
 
-With a premium UI, dynamic library sorting, automatic franchise grouping, and an intelligent feedback system, this bot adapts to your exact tastes over time.
+With a its UI, dynamic library sorting, automatic franchise grouping, and an intelligent feedback system, this bot adapts to your exact tastes over time.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Telegram Bot API](https://img.shields.io/badge/Telegram%20Bot%20API-pyTelegramBotAPI-26A5E4?logo=telegram&logoColor=white)
