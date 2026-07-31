@@ -10,6 +10,14 @@ With a its UI, dynamic library sorting, automatic franchise grouping, and an int
 
 ---
 
+## 🚀 Try It Live
+
+The application is hosted on an Oracle Cloud virtual machine and is available 24/7.
+Test the bot's functionality directly on Telegram:
+🤖 **[@MoviesRec_TeleBot](https://t.me/MoviesRec_TeleBot)**
+
+---
+
 ## ✨ Features
 
 *   **📦 Automatic Franchise Grouping**
@@ -45,8 +53,7 @@ The codebase follows a clean, **service-oriented** design:
 
 Prerequisites: Python 3.10+, a Telegram Bot Token, and a TMDB API key.
 
-This README is focused on a short, portfolio-friendly overview. For full
-developer-oriented setup, including environment setup, seeding a demo
+For full developer-oriented setup, including environment setup, seeding a demo
 database, and troubleshooting notes, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Suggested flow:
