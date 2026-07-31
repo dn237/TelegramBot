@@ -43,6 +43,7 @@ class MovieBot:
         self.library = LibraryHandler(self._bot, self._prefs)
         self.cards = MovieCardHandler(self._bot, self._prefs, self._tmdb)
 
+        self._configure_bot_menu()
         self._register_handlers()
 
     def run(self) -> None:
@@ -70,6 +71,31 @@ class MovieBot:
 
         b.message_handler(func=lambda m: True)(self._handle_text)
         b.callback_query_handler(func=lambda c: True)(self._handle_callback)
+
+    def _configure_bot_menu(self) -> None:
+        """Register command menu so Telegram Desktop/mobile can show it consistently."""
+        try:
+            self._bot.set_my_commands(
+                [
+                    types.BotCommand("start", "Open the main menu"),
+                    types.BotCommand("menu", "Alias for /start"),
+                    types.BotCommand("help", "Show available commands"),
+                    types.BotCommand("recommend_movies", "Recommend by movie title"),
+                    types.BotCommand("set_genre_preference", "Set favorite genre"),
+                    types.BotCommand("set_quality_preference", "Set rating/year filters"),
+                    types.BotCommand("set_blocked_languages", "Hide selected languages"),
+                    types.BotCommand("my_profile", "Show your profile"),
+                    types.BotCommand("my_movies", "Show all saved movies"),
+                    types.BotCommand("my_watched", "Show watched movies"),
+                    types.BotCommand("my_to_watch", "Show to-watch movies"),
+                    types.BotCommand("clear_preferences", "Reset all preferences"),
+                ]
+            )
+
+            # Force the chat menu button to open command list when supported.
+            self._bot.set_chat_menu_button(menu_button=types.MenuButtonCommands(type="commands"))
+        except Exception as e:
+            logger.warning("Could not configure Telegram command menu: %s", e)
 
     # ------------------------------------------------------------------
     # Command handlers
