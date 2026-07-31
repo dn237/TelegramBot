@@ -29,7 +29,11 @@ def backfill_old_movies():
         updated_count = 0
         for movie in old_movies:
             # 1. Fetch fresh, complete data from TMDB
-            tmdb_info = tmdb.get_movie_info(movie.tmdb_id)
+            # `movie.tmdb_id` is typed by the ORM as `Column[int]` which
+            # confuses Pylance when passing to a function expecting `int`.
+            # Use `cast(int, ...)` to inform the type checker while leaving
+            # the runtime value unchanged.
+            tmdb_info = tmdb.get_movie_info(cast(int, movie.tmdb_id))
             if not tmdb_info:
                 print(f"⚠️ [Skipping] Could not fetch TMDB data for ID: {movie.tmdb_id}")
                 continue
