@@ -62,3 +62,31 @@ python -m venv .venv
 
 # Install dependencies
 pip install -r requirements.txt
+
+### Configure environment
+
+Copy `.env.example` to `.env` and fill in your secrets (do not commit `.env`):
+
+```powershell
+copy .env.example .env
+# then edit .env and add your real keys
+```
+
+### Start the bot
+
+Activate the virtualenv and run:
+
+```powershell
+# Windows (PowerShell)
+d:/Projects/TelegramBot/.venv/Scripts/Activate.ps1
+python main.py
+
+# Or run directly with the venv Python:
+d:/Projects/TelegramBot/.venv/Scripts/python.exe main.py
+```
+
+### Notes for portfolio
+
+- Secrets should never be committed; `.env` is ignored by `.gitignore`.
+- Use `telegrambot.db` (SQLite) for demo data; include a small sample DB if you want to show live data.
+- Keep the code modular and well-documented — `main.py` is a small entrypoint suitable for showcasing in a portfolio.
