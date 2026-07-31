@@ -41,62 +41,18 @@ The codebase follows a clean, **service-oriented** design:
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
-### Prerequisites
-*   Python 3.10+
-*   A [Telegram Bot Token](https://core.telegram.org/bots#how-do-i-create-a-bot) (via BotFather)
-*   A [TMDB API Key](https://developer.themoviedb.org/docs/getting-started) (free account)
+Prerequisites: Python 3.10+, a Telegram Bot Token, and a TMDB API key.
 
-### Installation
+This README is focused on a short, portfolio-friendly overview. For full
+developer-oriented setup, including environment setup, seeding a demo
+database, and troubleshooting notes, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-# Clone the repository
-git clone [https://github.com/yourusername/TelegramBot.git](https://github.com/yourusername/TelegramBot.git)
-cd TelegramBot
+Suggested flow:
 
-# Create and activate a virtual environment
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+- Copy `.env.example` to `.env` and fill in your tokens (do not commit `.env`).
+- Create & activate a virtualenv and install `requirements.txt`.
+- Run `python main.py` (or use the venv python executable) to start the bot.
 
-# Install dependencies
-pip install -r requirements.txt
-
-### Configure environment
-
-Copy `.env.example` to `.env` and fill in your secrets (do not commit `.env`):
-
-```powershell
-copy .env.example .env
-# then edit .env and add your real keys
-```
-
-### Start the bot
-
-Activate the virtualenv and run:
-
-```powershell
-# Windows (PowerShell)
-d:/Projects/TelegramBot/.venv/Scripts/Activate.ps1
-python main.py
-
-# Or run directly with the venv Python:
-d:/Projects/TelegramBot/.venv/Scripts/python.exe main.py
-```
-
-### Notes for portfolio
-
-- Secrets should never be committed; `.env` is ignored by `.gitignore`.
-- Use `telegrambot.db` (SQLite) for demo data; include a small sample DB if you want to show live data.
-- Keep the code modular and well-documented — `main.py` is a small entrypoint suitable for showcasing in a portfolio.
-
-### Demo database
-
-To produce a reproducible demo DB suitable for screenshots or automated tests, run the provided seeder script. This creates `telegrambot.sample.db` by default and does not overwrite your real data.
-
-```powershell
-python scripts/seed_demo_db.py --out telegrambot.sample.db
-```
-
-If you previously committed `telegrambot.db` to the repository, consider removing it and using the seeder above to generate a sanitized example database.
+Use `scripts/seed_demo_db.py` to create a sanitized sample DB for screenshots.
