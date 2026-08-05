@@ -50,7 +50,7 @@ class MovieBot:
         """Start long-polling. In production you may replace this with
         a webhook-based deployment; polling is convenient for local demos."""
         logger.info("Bot is running.")
-        self._bot.polling(none_stop=True)
+        self._bot.infinity_polling(timeout=10, long_polling_timeout=5)
 
     def _register_handlers(self) -> None:
         b = self._bot
